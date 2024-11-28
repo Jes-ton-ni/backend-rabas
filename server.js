@@ -2623,6 +2623,76 @@ app.put('/update-booking-status/:id', (req, res) => {
   });
 });
 
+
+// Endpoint to fetch trips
+app.get('/trips', (req, res) => {
+  const userId = req.session?.user?.user_id;
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'User not logged in' });
+  }
+  const sql = 'SELECT * FROM trips WHERE user_id = ?';
+  connection.query(sql, [userId], (err, results) => {
+    res.json({ success: true, trips: results });
+  });
+});
+
+// Endpoint to add a new trip
+app.post('/add-trip', (req, res) => {
+  const { tripName, imageUrl, destination, startDate, endDate, itinerary, userId } = req.body;
+  // console.log('userId', userId);
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'User not logged in' });
+  }
+  const sql = 'INSERT INTO trips (user_id, tripName, imageUrl, destination, startDate, endDate, itinerary) VALUES (?, ?, ?, ?, ?, ?, ?)';
+  const values = [userId, tripName, imageUrl, destination, startDate, endDate, JSON.stringify(itinerary)];
+
+  connection.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Error inserting trip:', err);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+    res.status(201).json({ success: true, message: 'Trip added successfully' });
+  });
+});
+
+// Endpoint to update a trip
+app.put('/update-trip/:id', (req, res) => {
+  // console.log('req.body', req.body);
+  const tripId = req.params.id;
+  const { tripName, imageUrl, destination, startDate, endDate, itinerary } = req.body;
+  const userId = req.session?.user?.user_id; 
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'User not logged in' });
+  }
+
+  // Validate input
+  if (!tripName || !destination || !startDate || !endDate) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  const sql = `
+    UPDATE trips 
+    SET tripName = ?, imageUrl = ?, destination = ?, startDate = ?, endDate = ?, itinerary = ?
+    WHERE tripId = ? AND user_id = ?
+  `;
+
+  const values = [tripName, imageUrl, destination, startDate, endDate, JSON.stringify(itinerary), tripId, userId];
+
+  connection.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Error updating trip:', err);
+      return res.status(500).json({ success: false, message: 'Failed to update trip' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Trip not found or not authorized' });
+    }
+
+    res.json({ success: true, message: 'Trip updated successfully' });
+  });
+});
+
 //Para sa pag display ng accomodations
 // Endpoint to fetch accomodations
 app.get('/accomodations', (req, res) => {
@@ -3372,3 +3442,32 @@ function startServer() {
 }
 
 // Call startServer() after establishing the SSH connection
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('Received SIGINT. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Closed out remaining connections.');
+    process.exit(0);
+  });
+
+  // If after 10 seconds, forcefully shut down
+  setTimeout(() => {
+    console.error('Forcing shutdown...');
+    process.exit(1);
+  }, 10000);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Closed out remaining connections.');
+    process.exit(0);
+  });
+
+  // If after 10 seconds, forcefully shut down
+  setTimeout(() => {
+    console.error('Forcing shutdown...');
+    process.exit(1);
+  }, 10000);
+});
