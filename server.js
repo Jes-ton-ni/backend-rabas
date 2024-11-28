@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('events').EventEmitter.defaultMaxListeners = 15; // Increase the max listeners limit
 const express = require('express');
 const mysql = require('mysql2'); // Use the callback-based version
 const cors = require('cors'); // npm install cors
@@ -76,6 +77,12 @@ sshConnection.on('ready', () => {
       app.use(passport.initialize());
       app.use(passport.session());
 
+      // Test the session endpoint for debugging
+      app.get('/test-session', (req, res) => {
+        req.session.testValue = 'Test value';
+        res.send(`Session value: ${req.session.testValue}`);
+      });
+
       // Start the server after everything is ready
       startServer();
     }
@@ -86,6 +93,7 @@ sshConnection.on('ready', () => {
   username: process.env.SSH_USER,
   password: process.env.SSH_PASSWORD
 });
+
 
 // Error handling for SSH connection
 sshConnection.on('error', (err) => {
